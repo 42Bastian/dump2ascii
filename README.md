@@ -25,5 +25,5 @@ Example
 </pre>
 If the name is "hexdump" the format defaults to the canonical dump.<br>
 
-# Issues
-stdin does not work.
+# Author
+42Bastian
