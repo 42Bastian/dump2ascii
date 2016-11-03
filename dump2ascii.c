@@ -1,7 +1,7 @@
 /**
  ** Binary to ASCII dumper
  **
- ** (c) 2016 Bastian Schick
+ ** (c) 2016 42Bastian Schick
  **
  ** License: Public Domain
  **
