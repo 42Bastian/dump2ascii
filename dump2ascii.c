@@ -100,18 +100,24 @@ void dump(FILE *in,
   pf = fmt;
   c = 0;
 
-  if ( skip > len ){
-    skip = len;
+  if ( skip ){
+    if ( skip < len ){
+      err = fseek(in, skip, SEEK_CUR);
+
+      if ( err == EOF ){
+        len = 0;
+        pf = NULL;
+      } else {
+        pos += skip;
+        len -= skip;
+      }
+    } else {
+      len = 0;
+      pf = NULL;
+    }
   }
 
-  while( skip && c != EOF ){
-    c = getc(in);
-    ++pos;
-    --len;
-    --skip;
-  }
-
-  while ( len || *pf ){
+  while ( len || (pf && *pf) ){
     do{
       c = *pf++;
       if ( c == 0 ){
@@ -251,9 +257,11 @@ void dump(FILE *in,
       continue;
 
     case '{':
-      loopStart = pf;
-      loopCountMax = width;
-      loopCount = 0;
+      if ( width ){
+        loopStart = pf;
+        loopCountMax = width;
+        loopCount = 0;
+      }
       continue;
 
     case '}':
@@ -268,13 +276,18 @@ void dump(FILE *in,
       continue;
 
     case 'j':
-      err = 0;
-      while( width && err != EOF ){
-        err = getc(in);
-        --len;
-        --width;
-        ++pos;
+      err = fseek(in, width, SEEK_CUR);
+      len -= width;
+      pos += width;
+      if ( err == EOF ){
+        len = 0;
       }
+      continue;
+
+    case 'J':
+      err = fseek(in, -width, SEEK_CUR);
+      len += width;
+      pos -= width;
       if ( err == EOF ){
         len = 0;
       }
@@ -283,6 +296,7 @@ void dump(FILE *in,
     case 'a':
       if ( width ){
         sprintf(h,"%%%c%dx",fill,width);
+        printf("%s",h);
       } else {
         strcpy(h,"%08x");
       }
@@ -400,7 +414,7 @@ void dump(FILE *in,
       }while( c && p < h+sizeof(h));
       *p = 0;
 
-      width = ( width > (sizeof(h)-1) ) ? (sizeof(h)-1) : width;
+      width = ( widthq > (sizeof(h)-1) ) ? (sizeof(h)-1) : width;
 
       for( width -= strlen(h); width > 0 ; --width ){
         PUTCHAR(fill);
@@ -449,16 +463,26 @@ main (int argc, char *argv[])
               "        extra: %%[fill][size]q outputs line number decimal\n"
               "               %%[fill][size](a|A) outputs input stream position in hex\n"
               "               %%[size]j skips bytes in the input stream\n"
+              "               %%[size]J go back in the input stream\n"
               "               Typemodifiers: b - byte: %%02bx\n"
               "                              h - short: %%04hx\n"
               "               %%[size]$ back-reference to a previous %%d|%%x\n"
               "               %%0$ use loop counter as index\n"
               "skip: skip bytes at beginning of file\n"
               "-b: Select big endian reading\n"
-              "Example\n"
-              "-f \"%%08a: %%16{ %%02bx%%} : %%16{%%0$%%c%%}\\n\" for canonical dump:\n"
+              "Examples\n"
+              "-f \"%%08a: %%16{ %%02bx%%} : %%16{%%0$%%c%%}\\n\"\n"
               "00000000:  23 69 6E 63 6C 75 64 65 20 3C 73 74 64 69 6F 2E : #include <stdio.\n"
               "00000010:  68 3E 0D 0A 23 69 6E 63 6C 75 64 65 20 3C 73 74 : h>..#include <st\n"
+              "\n"
+              "-f \"%%A %%16{%%02bx %%}: %%16J%%16{%%c%%}\\n\\t%%16J %%8{%%04hx  %%}\\n%%16J\\t %%4{%%08x    %%}\\n\"\n"
+
+              "00000000 2f 2a 2a 0a 20 2a 2a 20 42 69 6e 61 72 79 20 74 : /**. ** Binary t\n"
+              "         2a2f  0a2a  2a20  202a  6942  616e  7972  7420\n"
+              "         0a2a2a2f    202a2a20    616e6942    74207972\n"
+              "00000010 6f 20 41 53 43 49 49 20 64 75 6d 70 65 72 0a 20 : o ASCII dumper.\n"
+              "         206f  5341  4943  2049  7564  706d  7265  200a\n"
+              "         5341206f    20494943    706d7564    200a7265\n"
         );
       return 0;
 
